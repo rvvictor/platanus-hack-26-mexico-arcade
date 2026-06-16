@@ -166,8 +166,11 @@ function create() {
 
   this.fx = this.add.graphics().setDepth(80);
   this.hud = this.add.graphics().setDepth(75);
-  this.glow = this.add.circle(CX, CY, 116, 0xf6ff00, 0.08).setDepth(1);
-  this.rocola = this.add.image(CX, CY, 'rocola').setDepth(20);
+  this.glow = this.add.circle(CX, CY, 130, 0xf6ff00, 0.08).setDepth(1);
+  this.rocolaAura = this.add.ellipse(CX, CY + 52, 190, 86, 0x43f5ff, 0.07).setDepth(2);
+  this.rocola = this.add.image(CX, CY, 'rocola').setDepth(20).setScale(1.05);
+  this.beatTarget = this.add.circle(CX, CY - 100, 9, 0xf7ffd8, 0.28).setDepth(22);
+  this.beatNeedle = this.add.circle(CX, CY - 100, 6, 0xf6ff00, 0.95).setDepth(23);
   this.bars = [];
   for (let i = 0; i < 10; i++) {
     const b = this.add.rectangle(CX - 45 + i * 10, CY - 6, 5, 12, i % 2 ? 0xff2d95 : 0xf6ff00, 0.9).setDepth(21);
@@ -207,6 +210,12 @@ function update(time, delta) {
 
   if (this.mode === 'over') {
     if (tap('START1') || tap('START2') || tap('P1_1') || tap('P2_1')) startRun(this, time, !!this.players[1].on);
+    wipeTaps();
+    return;
+  }
+
+  if (this.mode === 'name') {
+    updateNameEntry(this);
     wipeTaps();
     return;
   }
@@ -274,18 +283,50 @@ function joinP2(sc, on) {
 }
 
 function gameOver(sc, time) {
-  sc.mode = 'over';
+  sc.mode = 'name';
   sc.physics.world.timeScale = 1;
   clearEnemies(sc);
   clearPowerups(sc);
   sc.best.score = Math.max(sc.best.score || 0, sc.score);
   sc.best.combo = Math.max(sc.best.combo || 0, sc.bestCombo);
-  saveBest(sc);
-  sc.overScore.setText('SCORE ' + sc.score + '\nBEST ' + sc.best.score + '\nMAX COMBO x' + sc.bestCombo + '\n\nSTART = OTRA ROLA');
+  sc.name = ['A', 'A', 'A'];
+  sc.namePos = 0;
+  sc.nameSaved = false;
+  updateOverText(sc);
   sc.overBox.setVisible(true);
   pop(sc, 'ROCOLA DOWN', CX, 115, 0xff3344, 34);
   sc.cameras.main.shake(450, 0.025);
   tone(sc, 70, 0.4, 'sawtooth', 0.07);
+}
+
+function updateNameEntry(sc) {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (tap('P1_L') || tap('P2_L')) sc.namePos = (sc.namePos + 2) % 3;
+  if (tap('P1_R') || tap('P2_R')) sc.namePos = (sc.namePos + 1) % 3;
+  let i = abc.indexOf(sc.name[sc.namePos]);
+  if (tap('P1_U') || tap('P2_U')) sc.name[sc.namePos] = abc[(i + 1) % 26];
+  if (tap('P1_D') || tap('P2_D')) sc.name[sc.namePos] = abc[(i + 25) % 26];
+  if (tap('P1_1') || tap('P2_1')) {
+    if (sc.namePos < 2) sc.namePos++;
+    else saveName(sc);
+  }
+  if (tap('START1') || tap('START2')) saveName(sc);
+  updateOverText(sc);
+}
+
+function saveName(sc) {
+  if (sc.nameSaved) return;
+  sc.nameSaved = true;
+  sc.mode = 'over';
+  const n = sc.name.join('');
+  const list = (sc.best.leaders || []).concat([{ n, s: sc.score, c: sc.bestCombo }]);
+  list.sort((a, b) => b.s - a.s);
+  sc.best.leaders = list.slice(0, 5);
+  sc.best.score = Math.max(sc.best.score || 0, sc.score);
+  sc.best.combo = Math.max(sc.best.combo || 0, sc.bestCombo);
+  saveBest(sc);
+  updateOverText(sc);
+  tone(sc, 880, 0.1, 'triangle', 0.06);
 }
 
 function nextWave(sc, time) {
@@ -420,9 +461,16 @@ function skill(sc, p, time) {
 function superBlast(sc, p, time) {
   const ring = sc.add.circle(CX, CY, 35).setStrokeStyle(7, sc.song[1], 1).setDepth(70);
   sc.tweens.add({ targets: ring, scale: 13, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
+  for (let i = 0; i < 4; i++) {
+    const r = sc.add.circle(CX, CY, 42 + i * 18).setStrokeStyle(3, i % 2 ? sc.song[2] : 0xf6ff00, 0.72).setDepth(71);
+    sc.tweens.add({ targets: r, scale: 4.8 + i * 0.8, alpha: 0, duration: 360 + i * 90, onComplete: () => r.destroy() });
+  }
   radialHit(sc, CX, CY, 430, 4, time, true);
   sc.score += 400 * sc.combo;
+  sc.rocolaHp = Math.min(100, sc.rocolaHp + 12);
   pop(sc, 'ULTIMA CANCION', CX, 142, sc.song[1], 30);
+  pop(sc, 'ROCOLA +12', CX, CY - 92, 0x38ff88, 17);
+  hitStop(sc, 110, 0.35);
   sc.cameras.main.shake(360, 0.02);
   tone(sc, 120, 0.12, 'sawtooth', 0.06);
   sc.time.delayedCall(80, () => tone(sc, 240, 0.12, 'sawtooth', 0.055));
@@ -497,6 +545,7 @@ function updateEnemies(sc, time) {
       e.charge = time + 460;
       e.cvX = (dx / dist) * 330;
       e.cvY = (dy / dist) * 330;
+      warn(sc, e, e.cvX, e.cvY, 0xf6ff00, 430);
       e.setTint(0xfff0aa);
       sc.time.delayedCall(160, () => e.clearTint());
     }
@@ -506,6 +555,7 @@ function updateEnemies(sc, time) {
         e.charge = time + 560;
         e.cvX = (dx / dist) * 260;
         e.cvY = (dy / dist) * 260;
+        warn(sc, e, e.cvX, e.cvY, 0xff3344, 540);
         e.setTint(0xffffff);
         sc.time.delayedCall(140, () => e.clearTint());
       } else {
@@ -518,13 +568,18 @@ function updateEnemies(sc, time) {
       vy = e.cvY;
     }
     e.setVelocity(vx, vy);
-    if (Phaser.Math.Distance.Between(e.x, e.y, CX, CY) < (e.kind === 3 ? 92 : 58) && time > e.hitAt) {
+    if (e.hpBar) {
+      e.hpBg.setPosition(e.x, e.y - 64);
+      e.hpBar.setPosition(e.x - 31 + Math.max(0, e.hp / e.hpMax) * 31, e.y - 64);
+      e.hpBar.width = Math.max(0, 62 * e.hp / e.hpMax);
+    }
+    if (touchRocola(e) && time > e.hitAt) {
       e.hitAt = time + (e.kind === 3 ? 650 : 850);
       hurtRocola(sc, e.kind === 2 ? 8 : e.kind === 3 ? 12 : 5, time);
     }
     for (const p of sc.players) {
       if (!p.on || time < p.inv) continue;
-      if (Phaser.Math.Distance.Between(e.x, e.y, p.s.x, p.s.y) < (e.kind === 3 ? 58 : 34) && time > e.hitAt) {
+      if (Phaser.Math.Distance.Between(e.x, e.y, p.s.x, p.s.y) < e.rad + p.rad && time > e.hitAt) {
         e.hitAt = time + 650;
         hurtPlayer(sc, p, time);
       }
@@ -563,7 +618,28 @@ function spawnEnemy(sc, kind, time) {
   e.act = time + Phaser.Math.Between(700, 1600);
   e.charge = 0;
   e.setDepth(y);
-  e.body.setSize(kind === 3 ? 62 : 30, kind === 3 ? 64 : 34);
+  e.rad = kind === 3 ? 43 : kind === 2 ? 24 : kind === 1 ? 27 : 23;
+  e.body.setSize(kind === 3 ? 66 : kind === 2 ? 26 : 32, kind === 3 ? 70 : kind === 2 ? 36 : 38);
+  if (kind === 3) {
+    e.hpMax = e.hp;
+    e.hpBg = sc.add.rectangle(x, y - 64, 66, 7, 0x22060a, 0.9).setDepth(121);
+    e.hpBar = sc.add.rectangle(x, y - 64, 62, 4, 0xff3344, 0.95).setDepth(122);
+    pop(sc, 'JEFE NOPAL', CX, 116, 0xff3344, 26);
+  }
+}
+
+function touchRocola(e) {
+  const x = (e.x - CX) / (e.kind === 3 ? 105 : 82);
+  const y = (e.y - CY) / (e.kind === 3 ? 104 : 86);
+  return x * x + y * y < 1;
+}
+
+function warn(sc, e, dx, dy, c, d) {
+  const len = Math.hypot(dx, dy);
+  const a = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+  const l = sc.add.rectangle(e.x + dx / 2, e.y + dy / 2, len, e.kind === 3 ? 8 : 5, c, e.kind === 3 ? 0.32 : 0.24).setAngle(a).setDepth(45);
+  const r = sc.add.circle(e.x, e.y, e.kind === 3 ? 44 : 28).setStrokeStyle(3, c, 0.65).setDepth(46);
+  sc.tweens.add({ targets: [l, r], alpha: 0, duration: d, onComplete: () => { l.destroy(); r.destroy(); } });
 }
 
 function hitEnemy(sc, e, dmg, dx, dy, time, good) {
@@ -575,7 +651,9 @@ function hitEnemy(sc, e, dmg, dx, dy, time, good) {
   sc.time.delayedCall(80, () => {
     if (e.active) e.clearTint();
   });
+  if (good) hitStop(sc, 28, 0.55);
   if (e.hp <= 0) {
+    hitStop(sc, e.kind === 3 ? 95 : 48, 0.38);
     sc.score += (e.kind === 3 ? 500 : 45 + e.kind * 25) * sc.combo;
     pop(sc, e.kind === 3 ? 'BOSS KO' : '+' + (45 + e.kind * 25), e.x, e.y - 28, good ? sc.song[1] : 0xf6ff00, e.kind === 3 ? 24 : 14);
     burst(sc, e.x, e.y, e.kind === 3 ? 22 : 9, e.kind === 3 ? 0xff3344 : sc.song[1]);
@@ -587,8 +665,19 @@ function hitEnemy(sc, e, dmg, dx, dy, time, good) {
     } else if (Math.random() < 0.08) {
       dropPower(sc, e.x, e.y, 0);
     }
+    if (e.hpBar) {
+      e.hpBar.destroy();
+      e.hpBg.destroy();
+    }
     e.destroy();
   }
+}
+
+function hitStop(sc, d, s) {
+  sc.physics.world.timeScale = s;
+  sc.time.delayedCall(d, () => {
+    if (sc.mode !== 'over' && sc.mode !== 'name') sc.physics.world.timeScale = 1;
+  });
 }
 
 function hurtPlayer(sc, p, time) {
@@ -715,6 +804,14 @@ function animateRocola(sc, time) {
   const broken = time < sc.duckUntil;
   const power = Math.max(0.18, sc.musicVol || 1);
   sc.glow.setFillStyle(sc.song ? sc.song[1] : 0xf6ff00, beatGlow * power);
+  sc.rocolaAura.setFillStyle(sc.song ? sc.song[2] : 0x43f5ff, (onBeat(sc, time) ? 0.16 : 0.055) * power);
+  sc.rocolaAura.scaleX = 1 + Math.sin(time * 0.004) * 0.05;
+  sc.rocolaAura.scaleY = 1 + (onBeat(sc, time) ? 0.16 : 0);
+  const ph = ((time - sc.beatStart) % BEAT) / BEAT * Math.PI * 2 - Math.PI / 2;
+  sc.beatNeedle.setPosition(CX + Math.cos(ph) * 100, CY + Math.sin(ph) * 100);
+  sc.beatNeedle.setFillStyle(onBeat(sc, time) ? sc.song[1] : sc.song[2], onBeat(sc, time) ? 1 : 0.72);
+  sc.beatTarget.setFillStyle(onBeat(sc, time) ? sc.song[1] : 0xf7ffd8, onBeat(sc, time) ? 0.6 : 0.22);
+  sc.beatTarget.setScale(onBeat(sc, time) ? 1.45 : 1);
   sc.rocola.y = CY + Math.sin(time * 0.006) * 3 + (broken ? Math.sin(time * 0.09) * 2 : 0);
   sc.rocola.angle = broken ? Math.sin(time * 0.11) * 2 : 0;
   for (let i = 0; i < sc.bars.length; i++) {
@@ -730,6 +827,11 @@ function animateRocola(sc, time) {
 function drawHUD(sc) {
   sc.hud.clear();
   sc.hud.fillStyle(0x07070f, 0.72).fillRect(0, 0, W, 70);
+  if (sc.mode === 'play' && sc.rocolaHp < 36) {
+    const a = (36 - sc.rocolaHp) / 36;
+    sc.hud.lineStyle(5, 0xff3344, 0.25 + a * 0.5).strokeRect(5, 5, W - 10, H - 10);
+    sc.hud.fillStyle(0xff3344, 0.035 + a * 0.05).fillRect(0, 70, W, H - 70);
+  }
   bar(sc.hud, 22, 18, 210, 12, sc.rocolaHp / 100, 0xff3344, 0x361016);
   bar(sc.hud, 22, 42, 210, 10, sc.meter / 100, sc.song[1], 0x17231a);
   sc.scoreText.setText('SCORE ' + sc.score);
@@ -762,12 +864,12 @@ function makeTextUI(sc) {
   sc.titleBox.add(sc.add.rectangle(CX, CY, W, H, 0x07070f, 0.38));
   sc.titleBox.add(sc.add.text(CX, 116, 'ROCOLAPOCALYPSE', { fontFamily: 'monospace', fontSize: '48px', color: '#eaff00', fontStyle: 'bold' }).setOrigin(0.5));
   sc.titleBox.add(sc.add.text(CX, 164, 'CDMX: LA ULTIMA CANCION', { fontFamily: 'monospace', fontSize: '22px', color: '#ff4fc3', fontStyle: 'bold' }).setOrigin(0.5));
-  sc.titleBox.add(sc.add.text(CX, 462, 'START1 = SOLO   START2 = CO-OP\nBTN1 onda circular   BTN2 dash/parry/special\nCuida tus corazones y que no bajen el volumen.', { fontFamily: 'monospace', fontSize: '17px', color: '#f7ffd8', align: 'center' }).setOrigin(0.5));
+  sc.titleBox.add(sc.add.text(CX, 428, 'OBJETIVO: defiende la rocola y sobrevive cada rola.\nJOY mueve   BTN1 golpe luchador   BTN2 dash/parry/super\nCorazones curan. Discos dan boost. Golpea al ritmo.\nSTART1 solo   START2 coop', { fontFamily: 'monospace', fontSize: '16px', color: '#f7ffd8', align: 'center', lineSpacing: 6 }).setOrigin(0.5));
 
   sc.overBox = sc.add.container(0, 0).setDepth(135).setVisible(false);
   sc.overBox.add(sc.add.rectangle(CX, CY, W, H, 0x050507, 0.84));
   sc.overBox.add(sc.add.text(CX, 150, 'GAME OVER', { fontFamily: 'monospace', fontSize: '48px', color: '#ff3344', fontStyle: 'bold' }).setOrigin(0.5));
-  sc.overScore = sc.add.text(CX, 242, '', { fontFamily: 'monospace', fontSize: '22px', color: '#f7ffd8', align: 'center', fontStyle: 'bold' }).setOrigin(0.5, 0);
+  sc.overScore = sc.add.text(CX, 220, '', { fontFamily: 'monospace', fontSize: '18px', color: '#f7ffd8', align: 'center', fontStyle: 'bold', lineSpacing: 4 }).setOrigin(0.5, 0);
   sc.overBox.add(sc.overScore);
 }
 
@@ -778,12 +880,30 @@ function showTitle(sc) {
 
 async function loadBest(sc) {
   const r = await store().get(SAVE_KEY);
-  if (r.found && r.value && typeof r.value.score === 'number') sc.best = r.value;
+  if (r.found && r.value && typeof r.value.score === 'number') {
+    sc.best = {
+      score: r.value.score || 0,
+      combo: r.value.combo || 0,
+      leaders: Array.isArray(r.value.leaders) ? r.value.leaders.filter((x) => x && typeof x.s === 'number' && typeof x.n === 'string').slice(0, 5) : [],
+    };
+  }
   if (sc.bestText) sc.bestText.setText('BEST ' + (sc.best.score || 0));
 }
 
 function saveBest(sc) {
-  store().set(SAVE_KEY, { score: sc.best.score || 0, combo: sc.best.combo || 0 });
+  store().set(SAVE_KEY, { score: sc.best.score || 0, combo: sc.best.combo || 0, leaders: sc.best.leaders || [] });
+}
+
+function boardText(sc) {
+  const l = sc.best.leaders || [];
+  if (!l.length) return 'LEADERBOARD\n---';
+  return 'LEADERBOARD\n' + l.map((x, i) => i + 1 + '. ' + x.n + '  ' + x.s).join('\n');
+}
+
+function updateOverText(sc) {
+  const tag = sc.name ? sc.name.map((x, i) => (i === sc.namePos && sc.mode === 'name' ? '[' + x + ']' : ' ' + x + ' ')).join('') : '';
+  const msg = sc.mode === 'name' ? '\n\nINICIALES ' + tag + '\nJOY cambia  BTN1 avanza  START guarda' : '\n\nSTART = OTRA ROLA';
+  sc.overScore.setText('SCORE ' + sc.score + '\nBEST ' + sc.best.score + '\nMAX COMBO x' + sc.bestCombo + '\n\n' + boardText(sc) + msg);
 }
 
 function pop(sc, txt, x, y, col, size) {
@@ -836,11 +956,17 @@ function resetPlayer(sc, p, x, y) {
 function newPlayer(sc, id, x, y, tex) {
   const s = sc.physics.add.sprite(x, y, tex);
   s.body.setSize(30, 42);
-  return { id, s, on: true, maxHp: 4, hp: 4, dx: id ? -1 : 1, dy: 0, attack: 0, skill: 0, dash: 0, stun: 0, inv: 0, boost: 0 };
+  return { id, s, on: true, maxHp: 4, hp: 4, rad: 24, dx: id ? -1 : 1, dy: 0, attack: 0, skill: 0, dash: 0, stun: 0, inv: 0, boost: 0 };
 }
 
 function clearEnemies(sc) {
-  for (const e of sc.enemies.getChildren()) e.destroy();
+  for (const e of sc.enemies.getChildren()) {
+    if (e.hpBar) {
+      e.hpBar.destroy();
+      e.hpBg.destroy();
+    }
+    e.destroy();
+  }
   sc.enemies.clear(true, true);
 }
 
@@ -982,6 +1108,11 @@ function makeAmbience(sc) {
     const r = sc.add.rectangle(CX, 102, 10, 250, i % 2 ? 0xff4fc3 : 0x43f5ff, 0.04).setOrigin(0.5, 0).setDepth(-4);
     sc.rays.push(r);
   }
+  sc.petals = [];
+  for (let i = 0; i < 16; i++) {
+    const p = sc.add.ellipse(80 + i * 44, 310 + (i % 5) * 42, 10, 4, i % 2 ? 0xffb000 : 0xf6ff00, 0.34).setDepth(12);
+    sc.petals.push([p, i]);
+  }
   sc.tiles = [];
   for (let y = 374; y < 490; y += 28) {
     for (let x = 144; x < 680; x += 58) {
@@ -1028,6 +1159,13 @@ function animateScene(sc, time) {
     sc.rays[i].angle = i * 60 + time * 0.018;
     sc.rays[i].fillColor = i % 2 ? sc.song[1] : sc.song[2];
     sc.rays[i].alpha = 0.035 + (onBeat(sc, time) ? 0.04 : 0);
+  }
+  for (const a of sc.petals) {
+    const p = a[0];
+    p.x = 80 + a[1] * 44 + Math.sin(time * 0.0015 + a[1]) * 32;
+    p.y = 310 + (a[1] % 5) * 42 + Math.cos(time * 0.0018 + a[1]) * 18;
+    p.angle += 0.8 + a[1] * 0.03;
+    p.alpha = 0.22 + (onBeat(sc, time) ? 0.18 : 0) + (a[1] % 3) * 0.035;
   }
   sc.marquee.fillColor = onBeat(sc, time) ? sc.song[1] : sc.song[2];
   sc.marquee.alpha = 0.24 + (onBeat(sc, time) ? 0.42 : 0.08);
