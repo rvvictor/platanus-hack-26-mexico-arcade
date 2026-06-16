@@ -3,7 +3,7 @@ const H = 600;
 const CX = 400;
 const CY = 335;
 const SAVE_KEY = 'rocolapocalypse-cdmx-v1';
-const BPM = 104;
+const BPM = 126;
 const BEAT = 60000 / BPM;
 
 const CABINET_KEYS = {
@@ -111,13 +111,13 @@ function songTone(sc, f, d, type, vol, delay) {
 }
 
 const SONGS = [
-  ['ROCOLA DE ORO', 0xf6ff00, 0xff2d95, 185],
-  ['BALADA DEL CENTRO', 0x38ff88, 0xffb000, 165],
-  ['METRO SONIDERO', 0x69a7ff, 0xff54d7, 208],
-  ['NOCHE GARIBALDI', 0xff3344, 0x43f5ff, 139],
+  ['ROCOLA CUMBION', 0xf6ff00, 0xff2d95, 220],
+  ['SONIDERO NEON', 0x38ff88, 0xffb000, 196],
+  ['METRO FIESTA', 0x69a7ff, 0xff54d7, 247],
+  ['NOCHE GARIBALDI', 0xff3344, 0x43f5ff, 175],
 ];
-const MELO = [0, 4, 7, 12, 11, 7, 4, 2, 0, 5, 9, 12, 14, 12, 9, 7];
-const PROG = [0, 9, 5, 7];
+const MELO = [0, 7, 9, 12, 14, 12, 9, 7, 5, 9, 12, 16, 14, 12, 9, 5];
+const PROG = [0, 5, 9, 7];
 const CHORD = [0, 4, 7, 12];
 
 new Phaser.Game({
@@ -132,6 +132,7 @@ new Phaser.Game({
 });
 
 function preload() {
+  makeBackdrop(this);
   makeLuchador(this, 'p1', 0xeaff00, 0x0f1624, 0xff3344);
   makeLuchador(this, 'p2', 0xff4fc3, 0x10151a, 0x43f5ff);
   makeNopal(this, 'e0', 0x38d66f, 0x0f6136, 0);
@@ -354,11 +355,21 @@ function attack(sc, p, time) {
   const good = onBeat(sc, time);
   const rad = (good ? 102 : 78) + (time < p.boost ? 24 : 0);
   const dmg = (good ? 2 : 1) + (time < p.boost ? 1 : 0);
+  const ang = Math.atan2(p.dy, p.dx);
   let hits = 0;
   const ring = sc.add.circle(p.s.x, p.s.y, 18).setStrokeStyle(good ? 7 : 4, good ? sc.song[1] : 0xffffff, good ? 0.95 : 0.55).setDepth(82);
-  sc.tweens.add({ targets: ring, scale: rad / 18, alpha: 0, duration: 180, onComplete: () => ring.destroy() });
-  const arc = sc.add.ellipse(p.s.x + p.dx * 42, p.s.y + p.dy * 18, good ? 96 : 74, good ? 42 : 32, good ? sc.song[2] : 0xffffff, good ? 0.28 : 0.16).setAngle(Phaser.Math.RadToDeg(Math.atan2(p.dy, p.dx))).setDepth(83);
-  sc.tweens.add({ targets: arc, scaleX: 1.65, scaleY: 0.55, alpha: 0, duration: 150, onComplete: () => arc.destroy() });
+  sc.tweens.add({ targets: ring, scale: rad / 18, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
+  const arc = sc.add.ellipse(p.s.x + p.dx * 54, p.s.y + p.dy * 24, good ? 138 : 104, good ? 58 : 42, good ? sc.song[2] : 0xffffff, good ? 0.34 : 0.2).setAngle(Phaser.Math.RadToDeg(ang)).setDepth(83);
+  sc.tweens.add({ targets: arc, scaleX: 1.8, scaleY: 0.44, alpha: 0, duration: 180, onComplete: () => arc.destroy() });
+  const slash = sc.add.rectangle(p.s.x + p.dx * 70, p.s.y + p.dy * 30, good ? 136 : 102, good ? 12 : 8, good ? 0xf6ff00 : sc.song[2], 0.8).setAngle(Phaser.Math.RadToDeg(ang)).setDepth(84);
+  sc.tweens.add({ targets: slash, x: slash.x + p.dx * 36, y: slash.y + p.dy * 20, scaleY: 0.2, alpha: 0, duration: 135, onComplete: () => slash.destroy() });
+  const ghost = sc.add.image(p.s.x - p.dx * 10, p.s.y - 6, p.s.texture.key).setDepth(81).setAlpha(0.45).setTint(good ? sc.song[1] : 0xffffff).setFlipX(p.s.flipX);
+  sc.tweens.add({ targets: ghost, x: ghost.x - p.dx * 28, y: ghost.y - 10, alpha: 0, scale: 1.28, duration: 180, onComplete: () => ghost.destroy() });
+  for (let i = 0; i < (good ? 8 : 5); i++) {
+    const a = ang + Phaser.Math.FloatBetween(-0.65, 0.65);
+    const q = sc.add.circle(p.s.x + p.dx * 28, p.s.y + p.dy * 18, Phaser.Math.Between(2, good ? 6 : 4), i % 2 ? sc.song[1] : sc.song[2], 0.9).setDepth(85);
+    sc.tweens.add({ targets: q, x: q.x + Math.cos(a) * Phaser.Math.Between(42, 104), y: q.y + Math.sin(a) * Phaser.Math.Between(24, 70), alpha: 0, scale: 0.2, duration: 240, onComplete: () => q.destroy() });
+  }
   sc.fx.fillStyle(good ? sc.song[1] : 0xffffff, good ? 0.18 : 0.1);
   sc.fx.fillCircle(p.s.x, p.s.y, rad);
   sc.time.delayedCall(45, () => sc.fx.clear());
@@ -640,6 +651,7 @@ function pulseBeat(sc, time) {
     if (sc.mode === 'play') {
       playSongBeat(sc);
       if (sc.musicStep % 2 === 0) musicPop(sc);
+      if (sc.musicStep % 4 === 0) stageBurst(sc);
     }
   }
 }
@@ -648,24 +660,32 @@ function playSongBeat(sc) {
   const s = sc.musicStep++;
   const base = sc.song[3];
   const duck = sc.time.now < sc.duckUntil;
+  const hype = Math.min(5, Math.max(0, sc.wave - 1));
   const det = duck ? 0.97 + Math.random() * 0.06 : 1;
   const root = base * Math.pow(2, PROG[Math.floor(s / 4) % PROG.length] / 12);
-  const note = base * Math.pow(2, MELO[s % MELO.length] / 12) * det;
+  const note = base * Math.pow(2, (MELO[(s + hype) % MELO.length] + (hype > 3 && s % 2 ? 12 : 0)) / 12) * det;
   sc.musicVol = duck ? 0.18 : 1;
-  songTone(sc, s % 4 === 0 ? 54 : 78, 0.075, 'sine', s % 4 === 0 ? 0.065 : 0.03);
-  if (s % 4 === 1 || s % 4 === 3) songTone(sc, 156, 0.045, 'triangle', 0.032);
+  songTone(sc, s % 4 === 0 ? 54 : 86 + hype * 7, 0.07, 'sine', s % 4 === 0 ? 0.07 + hype * 0.006 : 0.032);
+  songTone(sc, 6400 + hype * 380, 0.025, 'square', 0.01 + hype * 0.002, 0.02);
+  songTone(sc, 7600 + hype * 420, 0.018, 'square', 0.007 + hype * 0.0015, BEAT / 2000);
+  if (hype > 1) songTone(sc, 5200 + hype * 250, 0.016, 'square', 0.006 + hype * 0.001, BEAT / 4000);
+  if (s % 4 === 1 || s % 4 === 3) songTone(sc, 170 + hype * 10, 0.05, 'triangle', 0.038 + hype * 0.003);
   if (s % 4 === 2) {
-    songTone(sc, 210, 0.045, 'triangle', 0.03);
-    songTone(sc, 420, 0.035, 'square', 0.012, 0.025);
+    songTone(sc, 230, 0.045, 'triangle', 0.034);
+    songTone(sc, 460, 0.035, 'square', 0.016, 0.025);
   }
-  songTone(sc, root * 0.5, 0.22, 'square', 0.034);
+  songTone(sc, root * 0.5, 0.16, 'square', 0.04 + hype * 0.003);
+  songTone(sc, root * 0.75, 0.08, 'sawtooth', 0.018 + hype * 0.002, BEAT / 3000);
   if (s % 2 === 0) {
-    for (let i = 0; i < 4; i++) songTone(sc, root * Math.pow(2, CHORD[i] / 12), 0.16, 'triangle', 0.019 - i * 0.002, 0.025 + i * 0.055);
+    for (let i = 0; i < 4; i++) songTone(sc, root * Math.pow(2, (CHORD[i] + (hype > 2 && i === 3 ? 12 : 0)) / 12), 0.13, i % 2 ? 'sine' : 'triangle', 0.021 - i * 0.002 + hype * 0.0015, 0.02 + i * 0.04);
   } else {
-    songTone(sc, root * 1.5, 0.1, 'triangle', 0.014, 0.06);
+    songTone(sc, root * 1.5, 0.085, 'triangle', 0.016, 0.04);
+    songTone(sc, root * 2, 0.065, 'sine', 0.011 + hype * 0.0015, 0.11);
   }
-  songTone(sc, note, 0.13, 'sawtooth', 0.026, 0.035);
-  if (s % 8 === 7) songTone(sc, note * 1.5, 0.12, 'triangle', 0.021, 0.14);
+  songTone(sc, note, 0.105, 'sawtooth', 0.031 + hype * 0.003, 0.025);
+  songTone(sc, note * 2, 0.035, 'square', 0.01 + hype * 0.0015, 0.09);
+  if (hype > 2 && s % 2 === 1) songTone(sc, note * 3, 0.032, 'square', 0.009, 0.135);
+  if (s % 8 === 7) songTone(sc, note * 1.5, 0.12, 'triangle', 0.024 + hype * 0.002, 0.13);
 }
 
 function musicPop(sc) {
@@ -677,6 +697,17 @@ function musicPop(sc) {
   n.add(sc.add.rectangle(6, -5, 3, 27, c, 0.9));
   n.add(sc.add.rectangle(13, -18, 16, 4, c, 0.75));
   sc.tweens.add({ targets: n, y: y - Phaser.Math.Between(44, 72), x: x + Phaser.Math.Between(-34, 34), angle: Phaser.Math.Between(-12, 12), alpha: 0, duration: 780, ease: 'Sine.easeOut', onComplete: () => n.destroy() });
+}
+
+function stageBurst(sc) {
+  const hype = Math.min(5, Math.max(0, sc.wave - 1));
+  for (let i = 0; i < 10 + hype * 3; i++) {
+    const side = i % 2 ? -1 : 1;
+    const x = CX + side * Phaser.Math.Between(70, 210 + hype * 18);
+    const y = CY + Phaser.Math.Between(-46, 74);
+    const p = sc.add.circle(x, y, Phaser.Math.Between(2, 5 + hype), i % 3 ? sc.song[1] : sc.song[2], 0.68 + hype * 0.04).setDepth(68);
+    sc.tweens.add({ targets: p, y: y - Phaser.Math.Between(26, 74 + hype * 12), x: x + side * Phaser.Math.Between(10, 54 + hype * 8), scale: 0.2, alpha: 0, duration: 470 + hype * 35, ease: 'Quad.easeOut', onComplete: () => p.destroy() });
+  }
 }
 
 function animateRocola(sc, time) {
@@ -804,7 +835,7 @@ function resetPlayer(sc, p, x, y) {
 
 function newPlayer(sc, id, x, y, tex) {
   const s = sc.physics.add.sprite(x, y, tex);
-  s.body.setSize(26, 36);
+  s.body.setSize(30, 42);
   return { id, s, on: true, maxHp: 4, hp: 4, dx: id ? -1 : 1, dy: 0, attack: 0, skill: 0, dash: 0, stun: 0, inv: 0, boost: 0 };
 }
 
@@ -819,48 +850,115 @@ function clearPowerups(sc) {
   sc.powerups.clear(true, true);
 }
 
+function makeBackdrop(sc) {
+  const t = sc.textures.createCanvas('backdrop', W, H);
+  const c = t.getContext();
+  let g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#110020');
+  g.addColorStop(0.35, '#07162a');
+  g.addColorStop(0.72, '#120816');
+  g.addColorStop(1, '#020207');
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  for (let i = 0; i < 7; i++) {
+    c.save();
+    c.translate(CX, 94);
+    c.rotate((-0.75 + i * 0.25));
+    g = c.createLinearGradient(0, 0, 0, 360);
+    g.addColorStop(0, i % 2 ? 'rgba(255,45,149,.22)' : 'rgba(67,245,255,.2)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g;
+    c.fillRect(-12, 0, 24, 370);
+    c.restore();
+  }
+  for (let i = 0; i < 44; i++) {
+    c.beginPath();
+    c.fillStyle = i % 3 ? 'rgba(255,240,170,.35)' : 'rgba(67,245,255,.28)';
+    c.arc(Math.random() * W, 8 + Math.random() * 170, 1 + Math.random() * 3.5, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.save();
+  c.shadowColor = '#ffbf38';
+  c.shadowBlur = 32;
+  c.fillStyle = 'rgba(255,190,70,.22)';
+  c.beginPath();
+  c.ellipse(CX, 165, 190, 74, 0, 0, Math.PI * 2);
+  c.fill();
+  c.shadowBlur = 18;
+  c.strokeStyle = 'rgba(255,210,90,.72)';
+  c.lineWidth = 5;
+  c.beginPath();
+  c.moveTo(CX, 64);
+  c.lineTo(CX, 232);
+  c.stroke();
+  c.lineWidth = 8;
+  c.strokeStyle = 'rgba(247,255,216,.62)';
+  c.beginPath();
+  c.moveTo(CX, 142);
+  c.lineTo(CX, 246);
+  c.stroke();
+  c.fillStyle = 'rgba(255,190,70,.92)';
+  c.beginPath();
+  c.moveTo(CX, 26);
+  c.lineTo(CX - 24, 64);
+  c.lineTo(CX + 24, 64);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = 'rgba(255,210,90,.68)';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.moveTo(CX - 14, 78);
+  c.bezierCurveTo(CX - 80, 102, CX - 90, 142, CX - 134, 162);
+  c.moveTo(CX + 14, 78);
+  c.bezierCurveTo(CX + 80, 102, CX + 90, 142, CX + 134, 162);
+  c.stroke();
+  c.fillStyle = 'rgba(247,255,216,.55)';
+  c.fillRect(CX - 42, 246, 84, 13);
+  c.fillRect(CX - 60, 262, 120, 10);
+  c.restore();
+  for (let i = 0; i < 2; i++) {
+    const y = 205 + i * 26;
+    g = c.createLinearGradient(0, y, W, y);
+    g.addColorStop(0, 'rgba(255,45,149,0)');
+    g.addColorStop(.5, i ? 'rgba(246,255,0,.36)' : 'rgba(67,245,255,.34)');
+    g.addColorStop(1, 'rgba(255,45,149,0)');
+    c.fillStyle = g;
+    c.fillRect(0, y, W, 4);
+  }
+  g = c.createRadialGradient(CX, 410, 40, CX, 410, 380);
+  g.addColorStop(0, 'rgba(255,45,149,.22)');
+  g.addColorStop(.45, 'rgba(67,245,255,.08)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g;
+  c.fillRect(0, 250, W, 350);
+  t.refresh();
+}
+
 function drawWorld(sc) {
+  sc.add.image(0, 0, 'backdrop').setOrigin(0).setDepth(-30);
   const g = sc.add.graphics().setDepth(-20);
-  g.fillStyle(0x07070f).fillRect(0, 0, W, H);
-  g.fillStyle(0x19081d).fillRect(0, 0, W, 92);
-  g.lineStyle(3, 0xff4fc3, 0.38).lineBetween(0, 88, W, 64);
-  g.lineStyle(3, 0xf6ff00, 0.35).lineBetween(0, 64, W, 92);
+  g.fillStyle(0x05070d, 0.34).fillRect(0, 246, W, 22);
   for (let x = 18; x < W; x += 34) {
-    g.fillStyle(x % 68 ? 0xff4fc3 : 0x43f5ff, 0.86).fillTriangle(x, 68, x + 18, 70, x + 9, 88);
+    g.fillStyle(x % 68 ? 0xff4fc3 : 0x43f5ff, 0.72).fillTriangle(x, 68, x + 18, 70, x + 9, 88);
   }
-  g.fillStyle(0x0b1020).fillRect(0, 90, W, 170);
-  for (let i = 0; i < 10; i++) {
-    const bx = i * 88 - 20;
-    g.fillStyle(i % 2 ? 0x0d1020 : 0x111a2c, 1).fillRect(bx, 118 + (i % 3) * 12, 54, 128);
-    g.fillStyle(i % 3 ? 0xffdc5e : 0x43f5ff, 0.56);
-    for (let y = 136; y < 238; y += 22) g.fillRect(bx + 14, y, 8, 12).fillRect(bx + 33, y + 4, 8, 10);
+  for (const x of [88, 712]) {
+    g.fillStyle(0x0b1020, 0.9).fillRect(x - 4, 285, 8, 148);
+    g.fillStyle(0xffd56a, 0.22).fillCircle(x, 274, 34);
+    g.fillStyle(0xffd56a, 0.82).fillCircle(x, 274, 8);
   }
-  g.fillStyle(0x15182a).fillRect(64, 174, 210, 82);
-  g.fillStyle(0x2d2740).fillRect(82, 142, 174, 116);
-  g.fillStyle(0x0c0d18).fillRect(103, 178, 20, 78).fillRect(142, 178, 20, 78).fillRect(181, 178, 20, 78).fillRect(220, 178, 20, 78);
-  g.fillStyle(0xf7ffd8, 0.78).fillCircle(169, 139, 50);
-  g.fillStyle(0x0b1020).fillRect(107, 139, 124, 52);
-  g.lineStyle(3, 0xffb000, 0.55).strokeCircle(169, 139, 48);
-  g.lineStyle(2, 0xf7ffd8, 0.18);
-  for (let r = 60; r < 126; r += 16) g.strokeCircle(169, 139, r);
-  for (const x of [72, 728]) {
-    g.fillStyle(0x0b1020).fillRect(x - 4, 285, 8, 148);
-    g.fillStyle(0xffd56a, 0.35).fillCircle(x, 274, 32);
-    g.fillStyle(0xffd56a, 0.85).fillCircle(x, 274, 9);
-  }
-  g.fillStyle(0x15182a).fillRect(586, 112, 34, 138);
-  g.fillStyle(0x43f5ff, 0.6).fillTriangle(603, 60, 582, 112, 624, 112);
-  g.fillStyle(0xff4fc3, 0.42).fillRect(598, 64, 10, 46);
-  g.fillStyle(0x0a0f1a).fillRect(0, 246, W, 22);
-  g.fillStyle(0x111018).fillRect(0, 250, W, 350);
-  g.fillStyle(0x231228).fillRect(0, 470, W, 130);
-  g.fillStyle(0x12141e).fillEllipse(CX, 394, 480, 164);
-  g.lineStyle(3, 0xff4fc3, 0.26).strokeEllipse(CX, 394, 510, 184);
-  g.lineStyle(3, 0xf6ff00, 0.2).strokeEllipse(CX, 394, 380, 130);
-  g.lineStyle(2, 0x43f5ff, 0.3);
+  g.fillStyle(0x111018, 0.72).fillRect(0, 250, W, 350);
+  g.fillStyle(0x2a102a).fillRect(0, 456, W, 144);
+  g.fillStyle(0x12141e, 0.9).fillEllipse(CX, 398, 560, 184);
+  g.fillStyle(0xff4fc3, 0.1).fillEllipse(CX, 398, 440, 130);
+  g.lineStyle(5, 0xff4fc3, 0.3).strokeEllipse(CX, 398, 560, 184);
+  g.lineStyle(3, 0xf6ff00, 0.26).strokeEllipse(CX, 398, 420, 134);
+  g.lineStyle(2, 0x43f5ff, 0.32);
   for (let x = -160; x < W + 120; x += 90) g.lineBetween(x, H, x + 250, 250);
-  g.lineStyle(1, 0xf6ff00, 0.18);
+  g.lineStyle(1, 0xf6ff00, 0.2);
   for (let y = 282; y < H; y += 34) g.lineBetween(0, y, W, y);
+  for (let r = 94; r < 320; r += 42) {
+    g.lineStyle(2, r % 84 ? 0x43f5ff : 0xff4fc3, 0.11).strokeEllipse(CX, 398, r * 1.75, r * 0.58);
+  }
   for (let i = 0; i < 22; i++) {
     const x = Phaser.Math.Between(20, 780);
     const y = Phaser.Math.Between(486, 586);
@@ -876,6 +974,14 @@ function makeAmbience(sc) {
   sc.domeGlow = sc.add.circle(169, 139, 86, 0xffb000, 0.08).setDepth(-8);
   sc.halo = sc.add.circle(CX, CY, 150).setStrokeStyle(3, SONGS[0][2], 0.2).setDepth(2);
   sc.marquee = sc.add.rectangle(CX, 268, 210, 8, SONGS[0][1], 0.42).setDepth(6);
+  sc.sweep = sc.add.rectangle(CX, 90, 24, 290, SONGS[0][2], 0.08).setOrigin(0.5, 0).setDepth(-5);
+  sc.sweep2 = sc.add.rectangle(CX, 88, 18, 300, SONGS[0][1], 0.06).setOrigin(0.5, 0).setDepth(-5);
+  sc.disco = sc.add.circle(CX, 82, 28, 0xf7ffd8, 0.18).setDepth(-3);
+  sc.rays = [];
+  for (let i = 0; i < 6; i++) {
+    const r = sc.add.rectangle(CX, 102, 10, 250, i % 2 ? 0xff4fc3 : 0x43f5ff, 0.04).setOrigin(0.5, 0).setDepth(-4);
+    sc.rays.push(r);
+  }
   sc.tiles = [];
   for (let y = 374; y < 490; y += 28) {
     for (let x = 144; x < 680; x += 58) {
@@ -913,6 +1019,16 @@ function animateScene(sc, time) {
   sc.domeGlow.setFillStyle(sc.song[2], onBeat(sc, time) ? 0.13 : 0.055);
   sc.halo.setStrokeStyle(onBeat(sc, time) ? 5 : 2, sc.song[2], onBeat(sc, time) ? 0.42 : 0.16);
   sc.halo.setScale(1 + Math.sin(time * 0.004) * 0.06);
+  sc.sweep.angle = Math.sin(time * 0.0017) * 38;
+  sc.sweep2.angle = Math.cos(time * 0.0014) * 44;
+  sc.sweep.fillColor = sc.song[2];
+  sc.sweep2.fillColor = sc.song[1];
+  sc.disco.setFillStyle(onBeat(sc, time) ? sc.song[1] : 0xf7ffd8, onBeat(sc, time) ? 0.34 : 0.16);
+  for (let i = 0; i < sc.rays.length; i++) {
+    sc.rays[i].angle = i * 60 + time * 0.018;
+    sc.rays[i].fillColor = i % 2 ? sc.song[1] : sc.song[2];
+    sc.rays[i].alpha = 0.035 + (onBeat(sc, time) ? 0.04 : 0);
+  }
   sc.marquee.fillColor = onBeat(sc, time) ? sc.song[1] : sc.song[2];
   sc.marquee.alpha = 0.24 + (onBeat(sc, time) ? 0.42 : 0.08);
   for (const a of sc.tiles) {
@@ -945,19 +1061,27 @@ function dotTex(sc) {
 
 function makeLuchador(sc, key, color, pants, mask) {
   const g = sc.make.graphics({ add: false });
-  g.fillStyle(0x000000, 0.35).fillEllipse(22, 45, 32, 8);
-  g.fillStyle(pants).fillRect(12, 25, 20, 16);
-  g.fillStyle(color).fillRect(9, 18, 26, 14);
-  g.fillStyle(mask).fillCircle(22, 12, 10);
-  g.fillStyle(0xffd2a0).fillEllipse(22, 14, 11, 9);
-  g.fillStyle(0xffffff).fillEllipse(17, 12, 5, 3).fillEllipse(27, 12, 5, 3);
-  g.fillStyle(0x07070f).fillCircle(17, 12, 1.5).fillCircle(27, 12, 1.5);
-  g.fillStyle(color).fillTriangle(12, 5, 20, 13, 12, 20).fillTriangle(32, 5, 24, 13, 32, 20);
-  g.fillStyle(0xffd2a0).fillRect(3, 21, 8, 14).fillRect(34, 21, 8, 14);
-  g.fillStyle(color).fillRect(1, 28, 10, 6).fillRect(34, 28, 10, 6);
-  g.fillStyle(0x06060a).fillRect(13, 40, 7, 8).fillRect(25, 40, 7, 8);
-  g.lineStyle(2, 0xffffff, 0.55).strokeRect(9, 18, 26, 14);
-  g.generateTexture(key, 46, 50);
+  g.fillStyle(0x000000, 0.34).fillEllipse(29, 59, 46, 10);
+  g.fillStyle(mask, 0.45).fillTriangle(11, 20, 29, 33, 5, 48).fillTriangle(47, 20, 29, 33, 53, 48);
+  g.fillStyle(pants).fillRoundedRect(16, 29, 26, 23, 5);
+  g.fillStyle(color).fillRoundedRect(12, 21, 34, 21, 6);
+  g.fillStyle(0xf7ffd8, 0.95).fillTriangle(20, 23, 29, 41, 38, 23);
+  g.fillStyle(mask).fillCircle(29, 14, 13);
+  g.fillStyle(color).fillTriangle(12, 5, 24, 15, 13, 25).fillTriangle(46, 5, 34, 15, 45, 25);
+  g.fillStyle(0xffd2a0).fillEllipse(29, 16, 14, 11);
+  g.fillStyle(0xffffff).fillEllipse(23, 13, 6, 3).fillEllipse(35, 13, 6, 3);
+  g.fillStyle(0x07070f).fillCircle(23, 13, 1.5).fillCircle(35, 13, 1.5);
+  g.lineStyle(2, color, 0.95).strokeCircle(29, 14, 12);
+  g.lineStyle(2, 0xf7ffd8, 0.78).lineBetween(29, 4, 29, 25).lineBetween(17, 15, 41, 15);
+  g.fillStyle(0xffd2a0).fillRoundedRect(2, 26, 11, 19, 5).fillRoundedRect(45, 26, 11, 19, 5);
+  g.fillStyle(color).fillRoundedRect(0, 36, 14, 8, 3).fillRoundedRect(44, 36, 14, 8, 3);
+  g.fillStyle(0xffb000).fillRect(14, 42, 30, 5);
+  g.fillStyle(0xf7ffd8).fillRect(26, 41, 6, 7);
+  g.fillStyle(pants).fillRoundedRect(16, 48, 9, 12, 3).fillRoundedRect(33, 48, 9, 12, 3);
+  g.fillStyle(mask).fillRoundedRect(13, 57, 14, 6, 3).fillRoundedRect(31, 57, 14, 6, 3);
+  g.lineStyle(2, 0xffffff, 0.48).strokeRoundedRect(12, 21, 34, 21, 6);
+  g.lineStyle(2, 0x07070f, 0.38).lineBetween(16, 30, 42, 30).lineBetween(19, 49, 24, 60).lineBetween(38, 49, 33, 60);
+  g.generateTexture(key, 58, 66);
   g.destroy();
 }
 
@@ -1025,17 +1149,70 @@ function makeBoss(sc) {
 }
 
 function makeRocola(sc) {
-  const g = sc.make.graphics({ add: false });
-  g.fillStyle(0x080812).fillRect(14, 32, 92, 98);
-  g.fillStyle(0x18102b).fillCircle(60, 32, 46);
-  g.fillStyle(0x18102b).fillRect(14, 32, 92, 100);
-  g.lineStyle(5, 0xf6ff00, 1).strokeCircle(60, 34, 38);
-  g.lineStyle(4, 0xff4fc3, 1).strokeRect(25, 54, 70, 30);
-  g.fillStyle(0x43f5ff, 0.9).fillRect(33, 62, 54, 14);
-  g.fillStyle(0xff4fc3).fillCircle(60, 103, 18);
-  g.fillStyle(0x07070f).fillCircle(60, 103, 9);
-  g.lineStyle(3, 0x43f5ff, 1).strokeRect(32, 92, 56, 30);
-  g.fillStyle(0xf6ff00).fillRect(37, 99, 6, 15).fillRect(50, 96, 6, 18).fillRect(63, 101, 6, 13).fillRect(76, 94, 6, 20);
-  g.generateTexture('rocola', 120, 140);
-  g.destroy();
+  const t = sc.textures.createCanvas('rocola', 150, 178);
+  const c = t.getContext();
+  c.shadowColor = 'rgba(0,0,0,.6)';
+  c.shadowBlur = 10;
+  c.fillStyle = 'rgba(0,0,0,.35)';
+  c.beginPath();
+  c.ellipse(75, 164, 54, 9, 0, 0, Math.PI * 2);
+  c.fill();
+  let g = c.createLinearGradient(30, 28, 120, 156);
+  g.addColorStop(0, '#41205d');
+  g.addColorStop(.42, '#120824');
+  g.addColorStop(1, '#050507');
+  c.shadowColor = '#ff2d95';
+  c.shadowBlur = 18;
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(75, 10);
+  c.bezierCurveTo(132, 10, 128, 76, 124, 92);
+  c.lineTo(136, 158);
+  c.lineTo(14, 158);
+  c.lineTo(26, 92);
+  c.bezierCurveTo(22, 76, 18, 10, 75, 10);
+  c.closePath();
+  c.fill();
+  c.shadowBlur = 0;
+  c.strokeStyle = '#f6ff00';
+  c.lineWidth = 5;
+  c.stroke();
+  c.shadowColor = '#43f5ff';
+  c.shadowBlur = 16;
+  c.strokeStyle = '#43f5ff';
+  c.lineWidth = 5;
+  c.beginPath();
+  c.arc(75, 58, 42, Math.PI * .1, Math.PI * .9, true);
+  c.stroke();
+  c.strokeStyle = '#ff2d95';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.arc(75, 58, 30, 0, Math.PI * 2);
+  c.stroke();
+  c.fillStyle = '#050507';
+  c.beginPath();
+  c.arc(75, 58, 17, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#f6ff00';
+  c.beginPath();
+  c.arc(75, 58, 6, 0, Math.PI * 2);
+  c.fill();
+  c.shadowBlur = 8;
+  c.fillStyle = '#43f5ff';
+  c.fillRect(39, 94, 72, 15);
+  c.fillStyle = '#050507';
+  c.fillRect(42, 97, 66, 9);
+  c.shadowBlur = 0;
+  for (let i = 0; i < 10; i++) {
+    const h = 8 + (i * 17) % 26;
+    c.fillStyle = i % 2 ? '#43f5ff' : '#ff2d95';
+    c.fillRect(39 + i * 7, 146 - h, 4, h);
+  }
+  c.strokeStyle = 'rgba(255,255,255,.26)';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(45, 28);
+  c.lineTo(104, 132);
+  c.stroke();
+  t.refresh();
 }

@@ -6,3 +6,5 @@ yarn.lock
 *.log
 .env
 .env.local
+.agents/
+skills-lock.json
